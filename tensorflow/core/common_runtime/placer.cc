@@ -19,6 +19,7 @@ limitations under the License.
 #include <set>
 #include <utility>
 #include <vector>
+#include <ofstream>
 
 #include "tensorflow/core/common_runtime/device.h"
 #include "tensorflow/core/framework/device_attributes.pb.h"
@@ -736,6 +737,67 @@ Status Placer::Run() {
     }
   }
 
+// Add codes to get the graph's informence, such as, the member of each colocation_graph
+// and the possible device
+  ofstream OutFile("out.txt", ios::out);
+  if (!OutFile.is_open()){
+    printf("Cannot open file\n");
+  }
+
+  for (Node* node : graph_->nodes()){
+    // get the Member of each node
+    if(!node->IsOp()){
+      /*
+       * print is not Op
+       * Node number、node name
+       */
+      OutFile << "Not , ID: " << node.id() << " Name: " 
+              << node.Name() << "\n";
+      continue;
+    }
+    /*
+     * print Op 
+     * Node num、member.parent,supported_device_types,device_name
+     * if the node is the colocation_group_root, also print the possible_devcies
+     * Also print the output of the node
+     */
+    Member MyMember = colocation_graph.members_[node.id()];
+    int ParentID = MyMember.parent;
+
+    OutFile << "Yes , ID: " << node.id() 
+            << " Name: " << node.Name() << "\n";
+    OutFile << "Parent ID: " << ParentID 
+            << " Supported_device_types: "<< MyMember.supported_device_types
+            << " device_name: " << Mymember.device_name << "\n"; 
+    OutFile << "Output Tensor Shape: " << <<"\n";
+
+    if (ParentID == node.id()){
+      /*
+       * the current node is the root of current colocation_group
+       * print the possible_devices
+       */
+      OutFile << "Possible_devices: " << MyMember.possible_devices << "\n";
+    }
+  }
+// End
+
+// Here need get the relationship of each Node
+  for (Node* node : graph_->nodes()){
+    /*
+     * need to figure out how to find the in_edges and out_edges of a node
+     * Get the input edge of the node
+     * Here can use in_nodes() to get the input node
+     */
+    std::vector<const Edge*> input_edges;
+    TF_RETURN_IF_ERROR(node->input_edges(&input_edges));
+    OutFile << "The input node of current node: ";
+    for (Edge* edge : input_edges){
+      // This is the id of the input node of current node
+      OutFile << edge->src().id() <<" ";
+    }
+    OutFile << "\n";
+  }
+// End
   // 3. For each node, assign a device based on the constraints in the
   // disjoint node set.
   std::vector<Node*> second_pass;
